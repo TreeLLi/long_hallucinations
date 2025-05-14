@@ -17,10 +17,24 @@ from eval_utils import (
 
 from data import MAJOR
 
-CLIENT = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
+# CLIENT = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
+
 api = wandb.Api()
 api.entity = os.environ['WANDB_API_ENTITY']
 
+
+from transformers import AutoModelForCausalLM, AutoTokenizer
+model_name = "Qwen/Qwen3-0.6B"
+
+# load the tokenizer and the model
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    torch_dtype="auto",
+    device_map="cuda"
+)
+
+print(model.device)
 
 def wandb_restore(wandb_run, filename):
     files_dir = 'tmp_wandb/'
@@ -66,6 +80,26 @@ def get_sentences(response):
         print(i)
 
 
+# @retry(wait=wait_random_exponential(min=1, max=10))
+# def oai_predict(prompt):
+#     """Predict with GPT-4 model."""
+
+#     if isinstance(prompt, str):
+#         messages = [
+#             {"role": "user", "content": prompt},
+#         ]
+#     else:
+#         messages = prompt
+
+#     output = CLIENT.chat.completions.create(
+#         model='gpt-4-0613',
+#         messages=messages,
+#         max_tokens=200,
+#     )
+#     response = output.choices[0].message.content
+#     return response
+
+
 @retry(wait=wait_random_exponential(min=1, max=10))
 def oai_predict(prompt):
     """Predict with GPT-4 model."""
@@ -77,12 +111,31 @@ def oai_predict(prompt):
     else:
         messages = prompt
 
-    output = CLIENT.chat.completions.create(
-        model='gpt-4-0613',
-        messages=messages,
-        max_tokens=200,
+    text = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=False # Switches between thinking and non-thinking modes. Default is True.
     )
-    response = output.choices[0].message.content
+
+    model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+    
+    # conduct text completion
+    generated_ids = model.generate(
+        **model_inputs,
+        max_new_tokens=32768
+    )
+    output_ids = generated_ids[0][len(model_inputs.input_ids[0]):].tolist() 
+    
+    # the result will begin with thinking content in <think></think> tags, followed by the actual response
+    response = tokenizer.decode(output_ids, skip_special_tokens=True)
+    
+    # output = CLIENT.chat.completions.create(
+    #     model='gpt-4-0613',
+    #     messages=messages,
+    #     max_tokens=200,
+    # )
+    # response = output.choices[0].message.content
     return response
 
 
