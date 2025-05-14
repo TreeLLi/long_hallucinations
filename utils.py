@@ -21,6 +21,8 @@ CLIENT = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
 api = wandb.Api()
 api.entity = os.environ['WANDB_API_ENTITY']
 
+# MODEL = 'gpt-4-0613'
+MODEL = 'gpt-4.1-nano'
 
 def wandb_restore(wandb_run, filename):
     files_dir = 'tmp_wandb/'
@@ -78,7 +80,7 @@ def oai_predict(prompt):
         messages = prompt
 
     output = CLIENT.chat.completions.create(
-        model='gpt-4-0613',
+        model=MODEL,
         messages=messages,
         max_tokens=200,
     )

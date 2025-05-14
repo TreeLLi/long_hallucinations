@@ -35,3 +35,4 @@ dependencies:
     - einops
     - bitsandbytes
     - sentencepiece
+    - transformers>=4.51.0
